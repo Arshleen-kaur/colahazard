@@ -1,0 +1,73 @@
+@using PackTrack.Models
+
+<MudPaper Class="pa-6 glass-panel" Elevation="0" Style="height: 100%;">
+    <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 700;">Recent Deliveries</MudText>
+
+    @if (Shipments.Any())
+    {
+        <MudTimeline TimelineOrientation="TimelineOrientation.Vertical" TimelinePosition="TimelinePosition.Start">
+            @foreach (var shipment in Shipments.Take(8))
+            {
+                <MudTimelineItem Color="@GetTimelineColor(shipment)" Size="Size.Small" 
+                                 Variant="Variant.Filled" Elevation="0">
+                    <ItemContent>
+                        <div class="timeline-card pa-3 rounded-lg mb-2">
+                            <div class="d-flex justify-space-between align-center">
+                                <MudText Typo="Typo.body2" Style="font-weight: 700;">
+                                    Shipment #@shipment.Id
+                                </MudText>
+                                <MudChip T="string" Size="Size.Small" Color="@GetTimelineColor(shipment)" Variant="Variant.Text">
+                                    @shipment.Status
+                                </MudChip>
+                            </div>
+                            <MudText Typo="Typo.caption" Class="d-block">
+                                <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Size="Size.Small" /> @shipment.TruckId
+                                → Route @shipment.RouteCode
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block">
+                                @if (shipment.ActualDelivery.HasValue)
+                                {
+                                    <span>Delivered @shipment.ActualDelivery.Value.ToString("MMM dd, HH:mm")</span>
+                                }
+                                else
+                                {
+                                    <span>Dispatched @shipment.PickupDate.ToString("MMM dd, HH:mm")</span>
+                                }
+                            </MudText>
+                        </div>
+                    </ItemContent>
+                </MudTimelineItem>
+            }
+        </MudTimeline>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+            No delivery history available yet.
+        </MudAlert>
+    }
+</MudPaper>
+
+<style>
+    .timeline-card {
+        background: rgba(255, 255, 255, 0.5);
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        transition: all 0.2s ease;
+    }
+    .timeline-card:hover {
+        background: rgba(255, 255, 255, 0.85);
+        transform: translateX(4px);
+    }
+</style>
+
+@code {
+    [Parameter] public IEnumerable<Shipment> Shipments { get; set; } = Enumerable.Empty<Shipment>();
+
+    private Color GetTimelineColor(Shipment s) => s.Status switch
+    {
+        "Delivered" => Color.Success,
+        "InTransit" when DateTime.Now > s.ExpectedDelivery => Color.Error,
+        "InTransit" => Color.Warning,
+        _ => Color.Default
+    };
+}

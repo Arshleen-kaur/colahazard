@@ -1,6 +1,7 @@
+# Delivery API endpoints module
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
-from typing import List
 from datetime import datetime
 
 from app.core.dependencies import get_db, get_current_user
@@ -92,4 +93,4 @@ async def delivery_status(
     if not status:
         raise HTTPException(status_code=404, detail="Shipment not found")
 
-    return status 
+    return status
