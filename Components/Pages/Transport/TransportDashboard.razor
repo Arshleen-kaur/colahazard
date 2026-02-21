@@ -1,0 +1,337 @@
+@page "/transport/dashboard"
+@using PackTrack.Components.Layout
+@using PackTrack.Components.Pages.Transport.Components
+@using PackTrack.Features.Dashboards.Logistics
+@using PackTrack.Models
+@using PackTrack.Models.Dtos
+@using PackTrack.Services
+@inherits PackTrack.Components.SafeComponent
+@inject ITransportDashboardViewModel VM
+@inject ManifestGenerator ManifestGenerator
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@inject ISnackbar Snackbar
+@layout LandingLayout
+
+<PageTitle>Transport Command Center - PackSight</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-8">
+    <!-- Header -->
+    <div class="d-flex justify-space-between align-center mb-8">
+        <div>
+            <MudText Typo="Typo.h4" Style="font-weight: 800; letter-spacing: -0.5px;">
+                Transport Command Center
+                <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Text">MVVM</MudChip>
+            </MudText>
+            <MudText Typo="Typo.subtitle1" Color="Color.Secondary">
+                Fleet Management • Live Tracking • Driver Analytics
+            </MudText>
+        </div>
+        <div class="d-flex gap-2">
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.TableChart"
+                       OnClick="ExportCsv" Size="Size.Small">Export CSV</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
+                       OnClick="RefreshDashboard" Size="Size.Small">Refresh</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ArrowBack"
+                       OnClick="NavigateBack">Exit to Roles</MudButton>
+        </div>
+    </div>
+
+    <!-- KPI Strip -->
+    <MudGrid Spacing="4" Class="mb-6">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-5 glass-panel kpi-card" Elevation="0">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.caption" Class="stat-label">Fleet Size</MudText>
+                    <div class="kpi-icon-wrap fleet-icon">
+                        <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Size="Size.Small" />
+                    </div>
+                </MudStack>
+                <MudText Typo="Typo.h3" Class="stat-value" Style="color: #F57F17;">@VM.TotalFleetSize</MudText>
+                <MudText Typo="Typo.caption">
+                    <span style="color: #00c853; font-weight: 600;">@VM.Fleet.Available available</span>
+                    • @VM.Fleet.OnRoad on road
+                </MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-5 glass-panel kpi-card" Elevation="0">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.caption" Class="stat-label">Active Shipments</MudText>
+                    <div class="kpi-icon-wrap shipment-icon">
+                        <MudIcon Icon="@Icons.Material.Filled.Inventory" Size="Size.Small" />
+                    </div>
+                </MudStack>
+                <MudText Typo="Typo.h3" Class="stat-value" Style="color: #ff9100;">@VM.ActiveShipmentCount</MudText>
+                <MudText Typo="Typo.caption">
+                    <span style="color: #00c853; font-weight: 600;">@VM.DeliveredCount delivered</span>
+                    @if (VM.ShipmentStats.Delayed > 0)
+                    {
+                        <span style="color: #ff5252;"> • @VM.ShipmentStats.Delayed delayed</span>
+                    }
+                </MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-5 glass-panel kpi-card" Elevation="0">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.caption" Class="stat-label">On-Time Delivery</MudText>
+                    <div class="kpi-icon-wrap ontime-icon">
+                        <MudIcon Icon="@Icons.Material.Filled.Timer" Size="Size.Small" />
+                    </div>
+                </MudStack>
+                <MudText Typo="Typo.h3" Class="stat-value" Style="color: #00c853;">@VM.OnTimeDeliveryPercent%</MudText>
+                <MudProgressLinear Color="Color.Success" Value="@VM.OnTimeDeliveryPercent" Size="Size.Small" Rounded="true" Class="mt-1" />
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-5 glass-panel kpi-card" Elevation="0">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.caption" Class="stat-label">Alerts</MudText>
+                    <div class="kpi-icon-wrap alert-icon">
+                        <MudIcon Icon="@Icons.Material.Filled.NotificationsActive" Size="Size.Small" />
+                    </div>
+                </MudStack>
+                <MudText Typo="Typo.h3" Class="stat-value" Style="@($"color: {(VM.AlertCount > 0 ? "#ff5252" : "#00c853")};")">@VM.AlertCount</MudText>
+                <MudText Typo="Typo.caption" Color="@(VM.AlertCount > 0 ? Color.Error : Color.Success)">
+                    @(VM.AlertCount > 0 ? "Requires attention" : "All systems clear")
+                </MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Tabbed Content -->
+    <MudTabs Elevation="0" Outlined="true" Color="Color.Warning" Rounded="true" PanelClass="pa-6" Class="glass-panel-tabs mb-8">
+        
+        <!-- TAB 1: FLEET & OVERVIEW -->
+        <MudTabPanel Icon="@Icons.Material.Filled.DirectionsCar" Text="FLEET & OVERVIEW">
+            <MudGrid Spacing="4">
+                <MudItem xs="12" md="5">
+                    <FleetOverview Trucks="@VM.Trucks" Summary="@VM.Fleet" UtilizationPercent="@VM.FleetUtilizationPercent" />
+                </MudItem>
+                <MudItem xs="12" md="7">
+                    <MudGrid Spacing="4">
+                        <MudItem xs="12">
+                            <AlertsPanel Alerts="@VM.Alerts" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <DeliveryTimeline Shipments="@VM.RecentDeliveries" />
+                        </MudItem>
+                    </MudGrid>
+                </MudItem>
+            </MudGrid>
+        </MudTabPanel>
+
+        <!-- TAB 2: SHIPMENTS & TRACKING -->
+        <MudTabPanel Icon="@Icons.Material.Filled.LocalShipping" Text="SHIPMENTS & TRACKING">
+            <ActiveShipments Shipments="@VM.Shipments" 
+                             OnMarkDelivered="HandleMarkDelivered"
+                             OnDownloadManifest="HandleDownloadManifest" />
+        </MudTabPanel>
+
+        <!-- TAB 3: PERFORMANCE & ANALYTICS -->
+        <MudTabPanel Icon="@Icons.Material.Filled.Analytics" Text="PERFORMANCE & ANALYTICS">
+            <MudGrid Spacing="4">
+                <MudItem xs="12">
+                    <DriverPerformance Drivers="@VM.DriverPerformance" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-6 glass-panel" Elevation="0">
+                        <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 700;">Fleet Utilization</MudText>
+                        <div class="d-flex flex-column align-center pa-4">
+                            <div class="utilization-ring mb-4" style="--percent: @VM.FleetUtilizationPercent;">
+                                <span class="utilization-value">@VM.FleetUtilizationPercent%</span>
+                            </div>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">
+                                @VM.Fleet.OnRoad of @VM.Fleet.Total trucks on road
+                            </MudText>
+                        </div>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-6 glass-panel" Elevation="0">
+                        <MudText Typo="Typo.h6" Class="mb-4" Style="font-weight: 700;">Shipment Distribution</MudText>
+                        <div class="pa-4">
+                            <div class="d-flex justify-space-between mb-3">
+                                <MudText Typo="Typo.body2">In Transit</MudText>
+                                <MudText Typo="Typo.body2" Style="font-weight: 700;">@VM.ShipmentStats.InTransit</MudText>
+                            </div>
+                            <MudProgressLinear Color="Color.Warning" Value="@GetShipmentPercent(VM.ShipmentStats.InTransit)" Size="Size.Medium" Rounded="true" Class="mb-4" />
+                            
+                            <div class="d-flex justify-space-between mb-3">
+                                <MudText Typo="Typo.body2">Delivered</MudText>
+                                <MudText Typo="Typo.body2" Style="font-weight: 700;">@VM.ShipmentStats.Delivered</MudText>
+                            </div>
+                            <MudProgressLinear Color="Color.Success" Value="@GetShipmentPercent(VM.ShipmentStats.Delivered)" Size="Size.Medium" Rounded="true" Class="mb-4" />
+                            
+                            <div class="d-flex justify-space-between mb-3">
+                                <MudText Typo="Typo.body2">Delayed</MudText>
+                                <MudText Typo="Typo.body2" Style="font-weight: 700;">@VM.ShipmentStats.Delayed</MudText>
+                            </div>
+                            <MudProgressLinear Color="Color.Error" Value="@GetShipmentPercent(VM.ShipmentStats.Delayed)" Size="Size.Medium" Rounded="true" />
+                        </div>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        </MudTabPanel>
+    </MudTabs>
+</MudContainer>
+
+<style>
+    .glass-panel {
+        background: rgba(255, 255, 255, 0.45);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.05);
+    }
+    
+    body {
+        background-color: #f8f6f0;
+        background-image: 
+            radial-gradient(at 0% 0%, hsla(40, 80%, 85%, 0.6) 0, transparent 50%),
+            radial-gradient(at 100% 0%, hsla(30, 60%, 75%, 0.4) 0, transparent 50%),
+            radial-gradient(at 50% 100%, hsla(45, 50%, 90%, 0.5) 0, transparent 50%);
+        min-height: 100vh;
+    }
+
+    .kpi-card {
+        transition: all 0.3s ease;
+        cursor: default;
+    }
+    .kpi-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.08);
+    }
+
+    .kpi-icon-wrap {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+    }
+    .fleet-icon { background: linear-gradient(135deg, #F09819, #EDDE5D); }
+    .shipment-icon { background: linear-gradient(135deg, #ff9100, #ff5252); }
+    .ontime-icon { background: linear-gradient(135deg, #11998e, #38ef7d); }
+    .alert-icon { background: linear-gradient(135deg, #FF512F, #DD2476); }
+
+    .stat-label {
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 600;
+    }
+    .stat-value {
+        font-weight: 800;
+        letter-spacing: -1px;
+    }
+
+    /* Utilization Ring */
+    .utilization-ring {
+        width: 140px;
+        height: 140px;
+        border-radius: 50%;
+        background: conic-gradient(
+            #ff9100 0% calc(var(--percent) * 1%),
+            rgba(0,0,0,0.06) calc(var(--percent) * 1%) 100%
+        );
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+    }
+    .utilization-ring::after {
+        content: '';
+        width: 110px;
+        height: 110px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.9);
+        position: absolute;
+    }
+    .utilization-value {
+        position: relative;
+        z-index: 1;
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #ff9100;
+    }
+
+    .fade-in {
+        animation: fadeInUp 0.4s ease-out;
+    }
+    @@keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+
+@code {
+    protected override void OnInitialized()
+    {
+        if (!Disposed)
+        {
+            VM.Load();
+        }
+    }
+
+    private void RefreshDashboard()
+    {
+        VM.Refresh();
+        Snackbar.Add("Dashboard refreshed.", Severity.Info);
+        SafeStateHasChanged();
+    }
+
+    private void HandleMarkDelivered(int shipmentId)
+    {
+        VM.MarkDeliveryComplete(shipmentId);
+        Snackbar.Add($"Shipment #{shipmentId} marked as delivered.", Severity.Success);
+        SafeStateHasChanged();
+    }
+
+    private async Task HandleDownloadManifest(int shipmentId)
+    {
+        try
+        {
+            var bytes = ManifestGenerator.GenerateManifest(shipmentId);
+            using var stream = new MemoryStream(bytes);
+            using var streamRef = new DotNetStreamReference(stream);
+            await JSRuntime.InvokeVoidAsync("downloadFileFromStream", $"Manifest_S{shipmentId}_{DateTime.Now:yyyyMMdd}.pdf", streamRef);
+            Snackbar.Add("Manifest exported.", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ExportCsv()
+    {
+        try
+        {
+            var bytes = VM.ExportShipmentsCsv();
+            using var stream = new MemoryStream(bytes);
+            using var streamRef = new DotNetStreamReference(stream);
+            await JSRuntime.InvokeVoidAsync("downloadFileFromStream", $"shipments_{DateTime.Now:yyyyMMdd}.csv", streamRef);
+            Snackbar.Add("Shipments CSV exported.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private double GetShipmentPercent(int value)
+    {
+        int total = VM.ShipmentStats.InTransit + VM.ShipmentStats.Delivered + VM.ShipmentStats.Delayed;
+        return total > 0 ? Math.Round((double)value / total * 100, 1) : 0;
+    }
+
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/roles");
+    }
+}
