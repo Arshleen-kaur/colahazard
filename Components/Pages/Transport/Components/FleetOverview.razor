@@ -1,0 +1,120 @@
+@using PackTrack.Models
+@using PackTrack.Models.Dtos
+
+<MudPaper Class="pa-6 glass-panel" Elevation="0" Style="height: 100%;">
+    <div class="d-flex justify-space-between align-center mb-4">
+        <MudText Typo="Typo.h6" Style="font-weight: 700;">Fleet Status</MudText>
+        <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Text">@Summary.Total Trucks</MudChip>
+    </div>
+
+    <!-- Summary Ring -->
+    <div class="d-flex gap-4 mb-5">
+        <div class="fleet-stat-mini">
+            <div class="fleet-dot available-dot"></div>
+            <div>
+                <MudText Typo="Typo.caption" Class="stat-label">Available</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight: 800; color: #00c853;">@Summary.Available</MudText>
+            </div>
+        </div>
+        <div class="fleet-stat-mini">
+            <div class="fleet-dot onroad-dot"></div>
+            <div>
+                <MudText Typo="Typo.caption" Class="stat-label">On Road</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight: 800; color: #ff9100;">@Summary.OnRoad</MudText>
+            </div>
+        </div>
+        <div class="fleet-stat-mini">
+            <div class="fleet-dot maint-dot"></div>
+            <div>
+                <MudText Typo="Typo.caption" Class="stat-label">Maintenance</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight: 800; color: #ff5252;">@Summary.Maintenance</MudText>
+            </div>
+        </div>
+    </div>
+
+    <!-- Utilization Bar -->
+    <MudText Typo="Typo.caption" Class="stat-label mb-1">Fleet Utilization</MudText>
+    <MudProgressLinear Color="Color.Warning" Value="@UtilizationPercent" Size="Size.Medium" Rounded="true" />
+    <MudText Typo="Typo.caption" Class="mt-1 d-block" Style="font-weight: 600;">@UtilizationPercent%</MudText>
+
+    <MudDivider Class="my-4" />
+
+    <!-- Truck List -->
+    <div style="max-height: 300px; overflow-y: auto;">
+        @foreach (var truck in Trucks)
+        {
+            <div class="d-flex justify-space-between align-center mb-3 pa-3 rounded-lg truck-card">
+                <div>
+                    <MudText Typo="Typo.body1" Style="font-weight: 700;">@truck.TruckNumber</MudText>
+                    <MudText Typo="Typo.caption">ID: @truck.TruckId</MudText>
+                    @if (!string.IsNullOrEmpty(truck.GPSDeviceId))
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Success">
+                            <MudIcon Icon="@Icons.Material.Filled.GpsFixed" Size="Size.Small" /> @truck.GPSDeviceId
+                        </MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Error">
+                            <MudIcon Icon="@Icons.Material.Filled.GpsOff" Size="Size.Small" /> No GPS
+                        </MudText>
+                    }
+                </div>
+                <div class="d-flex flex-column align-end gap-1">
+                    <MudChip T="string" Color="@GetStatusColor(truck.Status)" Size="Size.Small" Variant="Variant.Filled">@truck.Status</MudChip>
+                    <MudText Typo="Typo.caption">Cap: @truck.CapacityUnits units</MudText>
+                </div>
+            </div>
+        }
+        @if (!Trucks.Any())
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">No trucks registered in the system.</MudAlert>
+        }
+    </div>
+</MudPaper>
+
+<style>
+    .fleet-stat-mini {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .fleet-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+    .available-dot { background: #00c853; box-shadow: 0 0 8px rgba(0, 200, 83, 0.5); }
+    .onroad-dot { background: #ff9100; box-shadow: 0 0 8px rgba(255, 145, 0, 0.5); animation: pulse-dot 2s infinite; }
+    .maint-dot { background: #ff5252; }
+    .truck-card {
+        background: rgba(255, 255, 255, 0.5);
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+    }
+    .truck-card:hover {
+        background: rgba(255, 255, 255, 0.8);
+        border-color: rgba(89, 74, 226, 0.3);
+        transform: translateX(4px);
+    }
+    @@keyframes pulse-dot {
+        0% { box-shadow: 0 0 0 0 rgba(255, 145, 0, 0.7); }
+        70% { box-shadow: 0 0 0 8px rgba(255, 145, 0, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(255, 145, 0, 0); }
+    }
+</style>
+
+@code {
+    [Parameter] public IEnumerable<Truck> Trucks { get; set; } = Enumerable.Empty<Truck>();
+    [Parameter] public FleetSummary Summary { get; set; } = new(0, 0, 0, 0);
+    [Parameter] public double UtilizationPercent { get; set; }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "Available" => Color.Success,
+        "OnRoad" => Color.Warning,
+        "Maintenance" => Color.Error,
+        _ => Color.Default
+    };
+}

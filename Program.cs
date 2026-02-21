@@ -26,6 +26,7 @@ builder.Services.AddScoped<PackTrack.Services.SustainabilityService>();
 builder.Services.AddScoped<PackTrack.Services.ReportingService>();
 builder.Services.AddScoped<PackTrack.Services.PdfReportService>();
 builder.Services.AddScoped<PackTrack.Services.ManifestGenerator>();
+builder.Services.AddScoped<PackTrack.Features.Dashboards.Logistics.ITransportDashboardViewModel, PackTrack.Features.Dashboards.Logistics.TransportDashboardViewModel>();
 
 
 
