@@ -1,0 +1,84 @@
+@using PackTrack.Models.Dtos
+
+<MudPaper Class="pa-6 glass-panel alerts-panel" Elevation="0" Style="height: 100%;">
+    <div class="d-flex justify-space-between align-center mb-4">
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.NotificationsActive" Color="Color.Error" />
+            <MudText Typo="Typo.h6" Style="font-weight: 700;">Alerts</MudText>
+        </div>
+        @if (Alerts.Any())
+        {
+            <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Filled">@Alerts.Count</MudChip>
+        }
+    </div>
+
+    <div style="max-height: 350px; overflow-y: auto;">
+        @if (Alerts.Any())
+        {
+            @foreach (var alert in Alerts.OrderByDescending(a => GetSeverityWeight(a.Severity)))
+            {
+                <div class="alert-card pa-3 mb-3 rounded-lg" style="border-left: 4px solid @GetSeverityColor(alert.Severity);">
+                    <div class="d-flex justify-space-between align-center">
+                        <div class="d-flex align-center gap-2">
+                            <MudIcon Icon="@GetSeverityIcon(alert.Severity)" Size="Size.Small" Style="@($"color: {GetSeverityColor(alert.Severity)};")" />
+                            <MudText Typo="Typo.body2" Style="font-weight: 700;">@alert.Title</MudText>
+                        </div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@alert.Timestamp.ToString("HH:mm")</MudText>
+                    </div>
+                    <MudText Typo="Typo.caption" Class="d-block mt-1" Color="Color.Secondary">@alert.Description</MudText>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="d-flex flex-column align-center justify-center pa-8">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" Class="mb-2" />
+                <MudText Typo="Typo.body1" Style="font-weight: 600;" Color="Color.Success">All Clear</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">No active alerts at this time.</MudText>
+            </div>
+        }
+    </div>
+</MudPaper>
+
+<style>
+    .alerts-panel {
+        border: 1px solid rgba(255, 82, 82, 0.15);
+        background: rgba(255, 245, 245, 0.3);
+    }
+    .alert-card {
+        background: rgba(255, 255, 255, 0.6);
+        transition: all 0.2s ease;
+    }
+    .alert-card:hover {
+        background: rgba(255, 255, 255, 0.9);
+        transform: translateX(4px);
+    }
+</style>
+
+@code {
+    [Parameter] public List<TransportAlert> Alerts { get; set; } = new();
+
+    private string GetSeverityColor(string severity) => severity switch
+    {
+        "Error" => "#ff5252",
+        "Warning" => "#ff9100",
+        "Info" => "#2196f3",
+        _ => "#9e9e9e"
+    };
+
+    private string GetSeverityIcon(string severity) => severity switch
+    {
+        "Error" => Icons.Material.Filled.Error,
+        "Warning" => Icons.Material.Filled.Warning,
+        "Info" => Icons.Material.Filled.Info,
+        _ => Icons.Material.Filled.Circle
+    };
+
+    private int GetSeverityWeight(string severity) => severity switch
+    {
+        "Error" => 3,
+        "Warning" => 2,
+        "Info" => 1,
+        _ => 0
+    };
+}

@@ -1,0 +1,103 @@
+@using PackTrack.Models
+
+<MudPaper Class="pa-6 glass-panel" Elevation="0">
+    <div class="d-flex justify-space-between align-center mb-4">
+        <MudText Typo="Typo.h6" Style="font-weight: 700;">Live Shipments</MudText>
+        <div class="d-flex gap-2 align-center">
+            <MudTextField @bind-Value="searchTerm" Placeholder="Search route / truck…" Variant="Variant.Outlined" 
+                          Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                          Immediate="true" Style="max-width: 220px;" />
+            <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Text">@filteredShipments.Count() total</MudChip>
+        </div>
+    </div>
+
+    <MudTable Items="@filteredShipments" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="0" Dense="true" 
+              Striped="true" FixedHeader="true" Height="420px">
+        <HeaderContent>
+            <MudTh><MudTableSortLabel SortBy="new Func<Shipment, object>(x => x.Id)">ID</MudTableSortLabel></MudTh>
+            <MudTh>Dispatch</MudTh>
+            <MudTh>Truck</MudTh>
+            <MudTh>Route</MudTh>
+            <MudTh>Driver</MudTh>
+            <MudTh>Expected</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>IoT Health</MudTh>
+            <MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="ID">
+                <MudText Typo="Typo.body2" Style="font-weight: 700;">#@context.Id</MudText>
+            </MudTd>
+            <MudTd DataLabel="Dispatch">@context.PickupDate.ToString("MMM dd, HH:mm")</MudTd>
+            <MudTd DataLabel="Truck">
+                <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">@context.TruckId</MudChip>
+            </MudTd>
+            <MudTd DataLabel="Route">
+                <MudText Typo="Typo.body2">@context.RouteCode</MudText>
+            </MudTd>
+            <MudTd DataLabel="Driver">@(string.IsNullOrEmpty(context.DriverId) ? "—" : context.DriverId)</MudTd>
+            <MudTd DataLabel="Expected">
+                <span style="color: @(DateTime.Now > context.ExpectedDelivery && context.Status == "InTransit" ? "#ff5252" : "inherit"); font-weight: 600;">
+                    @context.ExpectedDelivery.ToString("MMM dd")
+                </span>
+            </MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context)" Variant="Variant.Filled">@context.Status</MudChip>
+            </MudTd>
+            <MudTd DataLabel="IoT Health">
+                <div class="d-flex gap-1">
+                    <MudTooltip Text="@($"Temp: {context.TemperatureLogId}")">
+                        <MudIcon Icon="@Icons.Material.Filled.Thermostat" Size="Size.Small" Color="@(string.IsNullOrEmpty(context.TemperatureLogId) ? Color.Error : Color.Success)" />
+                    </MudTooltip>
+                    <MudTooltip Text="@($"Humidity: {context.HumidityLogId}")">
+                        <MudIcon Icon="@Icons.Material.Filled.WaterDrop" Size="Size.Small" Color="@(string.IsNullOrEmpty(context.HumidityLogId) ? Color.Error : Color.Info)" />
+                    </MudTooltip>
+                    <MudTooltip Text="@($"Shock: {context.ShockLogId}")">
+                        <MudIcon Icon="@Icons.Material.Filled.Speed" Size="Size.Small" Color="@(string.IsNullOrEmpty(context.ShockLogId) ? Color.Default : Color.Warning)" />
+                    </MudTooltip>
+                </div>
+            </MudTd>
+            <MudTd DataLabel="Actions">
+                <div class="d-flex gap-1">
+                    @if (context.Status == "InTransit")
+                    {
+                        <MudTooltip Text="Mark Delivered">
+                            <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small"
+                                           OnClick="@(() => OnMarkDelivered.InvokeAsync(context.Id))" />
+                        </MudTooltip>
+                    }
+                    <MudTooltip Text="Download Manifest">
+                        <MudIconButton Icon="@Icons.Material.Filled.PictureAsPdf" Color="Color.Error" Size="Size.Small"
+                                       OnClick="@(() => OnDownloadManifest.InvokeAsync(context.Id))" />
+                    </MudTooltip>
+                </div>
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new int[] { 5, 10, 25 }" />
+        </PagerContent>
+    </MudTable>
+</MudPaper>
+
+@code {
+    [Parameter] public IEnumerable<Shipment> Shipments { get; set; } = Enumerable.Empty<Shipment>();
+    [Parameter] public EventCallback<int> OnMarkDelivered { get; set; }
+    [Parameter] public EventCallback<int> OnDownloadManifest { get; set; }
+
+    private string searchTerm = string.Empty;
+
+    private IEnumerable<Shipment> filteredShipments => string.IsNullOrWhiteSpace(searchTerm)
+        ? Shipments
+        : Shipments.Where(s =>
+            (s.RouteCode?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (s.TruckId?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (s.DriverId?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false));
+
+    private Color GetStatusColor(Shipment s) => s.Status switch
+    {
+        "InTransit" when DateTime.Now > s.ExpectedDelivery => Color.Error,
+        "InTransit" => Color.Warning,
+        "Delivered" => Color.Success,
+        _ => Color.Default
+    };
+}
